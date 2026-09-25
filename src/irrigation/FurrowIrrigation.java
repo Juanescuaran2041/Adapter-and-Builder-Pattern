@@ -1,29 +1,24 @@
 package irrigation;
 
-// Traditional Andean gravity irrigation through furrows (no pump needed)
 public class FurrowIrrigation implements IrrigationStrategy {
     @Override
-    public IrrigationDecision activate(double moisture, double temperature) {
+    public IrrigationResult activate(double moisture, double temperature) {
         if (temperature <= 0) {
-            return IrrigationDecision.frostHold("Furrows closed: standing water would freeze over the roots");
+            return new IrrigationResult("FROST_HOLD", "Furrows closed, the water would freeze on the roots", 0);
         }
-        return moisture < 30
-                ? IrrigationDecision.active("Furrow irrigation OPEN (gravity, high consumption)", 8)
-                : IrrigationDecision.standby("Furrows closed, moisture sufficient");
+        if (moisture < 30) {
+            return new IrrigationResult("ACTIVE", "Furrow irrigation OPEN (gravity, uses a lot of water)", 8);
+        }
+        return new IrrigationResult("STANDBY", "Furrows closed, moisture sufficient", 0);
     }
 
     @Override
-    public String code() {
-        return "FURROW";
+    public String getName() {
+        return "Furrow";
     }
 
     @Override
-    public String name() {
-        return "Furrow (gravity)";
-    }
-
-    @Override
-    public double efficiency() {
+    public double getEfficiency() {
         return 0.55;
     }
 }

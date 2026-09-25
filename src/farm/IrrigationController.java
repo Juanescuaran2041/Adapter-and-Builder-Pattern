@@ -1,50 +1,52 @@
 package farm;
 
+import irrigation.DripIrrigation;
+import irrigation.FurrowIrrigation;
 import irrigation.GrowthStage;
-import irrigation.IrrigationDecision;
-import irrigation.IrrigationStrategies;
+import irrigation.IrrigationResult;
+import irrigation.IrrigationStrategy;
+import irrigation.SprinklerIrrigation;
 import simulation.FarmClock;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Deque;
 import java.util.List;
-import java.util.Locale;
 
-// Works only against the SoilMoistureSensor and Crop abstractions:
-// it does not know which physical device or irrigation method is behind them.
 public class IrrigationController {
 
-    private static final int LOG_SIZE = 150;
-    private static final int COMMUNAL_TURN_HOUR = 6;
+    //liters that the community gives every day at 6am
+    private static final double WATER_TURN = 18000;
 
     private final FarmClock clock;
     private final WaterReservoir reservoir;
     private final List<Parcel> parcels;
-    private final Deque<LogEntry> log = new ArrayDeque<>();
+    private final List<LogEntry> log = new ArrayList<>();
 
     public IrrigationController(FarmClock clock, WaterReservoir reservoir, List<Parcel> parcels) {
         this.clock = clock;
         this.reservoir = reservoir;
-        this.parcels = List.copyOf(parcels);
-        parcels.forEach(this::evaluate);
-    }
-
-    public synchronized void tick() {
-        clock.advance();
-        if (clock.hour() == COMMUNAL_TURN_HOUR) {
-            double received = reservoir.receiveCommunalTurn();
-            log(null, "INFO", String.format(Locale.US, "Communal water turn: %.0f L added to the reservoir", received));
-        }
+        this.parcels = parcels;
         for (Parcel parcel : parcels) {
-            parcel.getSoil().evaporate();
             evaluate(parcel);
         }
     }
 
-    public synchronized void tick(int hours) {
+    public synchronized void nextHour() {
+        clock.nextHour();
+
+        if (clock.getHour() == 6) {
+            reservoir.addWater(WATER_TURN);
+            addLog("Farm", "INFO", "Communal water turn, " + (int) WATER_TURN + " L added to the reservoir");
+        }
+
+        for (Parcel parcel : parcels) {
+            parcel.getSoil().dry(clock.getTemperature());
+            evaluate(parcel);
+        }
+    }
+
+    public synchronized void advance(int hours) {
         for (int i = 0; i < hours; i++) {
-            tick();
+            nextHour();
         }
     }
 
@@ -52,67 +54,85 @@ public class IrrigationController {
         double moisture;
         try {
             moisture = parcel.getSensor().readSoilPercentage();
-        } catch (RuntimeException e) {
-            IrrigationDecision error = IrrigationDecision.sensorError("Reading discarded: " + e.getMessage());
-            parcel.recordDecision(error);
-            log(parcel, "ERROR", error.message());
+        } catch (IllegalStateException e) {
+            parcel.setResult(new IrrigationResult("ERROR", "Reading discarded: " + e.getMessage(), 0));
+            addLog(parcel.getName(), "ERROR", "Reading discarded: " + e.getMessage());
             return;
         }
-        // Parcels without a temperature probe use the farm weather station
-        double temperature = parcel.getSensor().readTemperature().orElse(clock.ambientTemperature());
-        parcel.recordReading(moisture, temperature);
+        parcel.setMoisture(moisture);
 
-        IrrigationDecision decision = parcel.getCrop().evaluateIrrigation(moisture, temperature);
+        IrrigationResult result = parcel.getCrop().evaluateIrrigation(moisture, clock.getTemperature());
 
-        if (decision.usesWater()) {
-            double liters = decision.litersPerM2() * parcel.getAreaM2();
-            if (reservoir.withdraw(liters)) {
-                double efficiency = parcel.getCrop().irrigationEfficiency();
-                parcel.getSoil().irrigate(decision.litersPerM2() * efficiency);
-                parcel.addWaterUsed(liters);
-                log(parcel, decision.status() == IrrigationDecision.Status.FROST_PROTECTION ? "FROST" : "WATER",
-                        String.format(Locale.US, "%s — %.0f L", decision.message(), liters));
+        if (result.getLitersPerM2() > 0) {
+            double liters = result.getLitersPerM2() * parcel.getArea();
+
+            if (reservoir.useWater(liters)) {
+                //not all the water reaches the roots, it depends on the irrigation method
+                double realWater = result.getLitersPerM2() * parcel.getCrop().getIrrigationEfficiency();
+                parcel.getSoil().addWater(realWater);
+                parcel.setWaterUsed(parcel.getWaterUsed() + liters);
+
+                String type = "WATER";
+                if (result.getStatus().equals("ANTI_FROST")) {
+                    type = "FROST";
+                }
+                addLog(parcel.getName(), type, result.getMessage() + " (" + (int) liters + " L)");
             } else {
-                decision = decision.denied(String.format(Locale.US,
-                        "not enough water in the reservoir (%.0f L required), wait for the communal turn", liters));
-                log(parcel, "WARN", decision.message());
+                result.setStatus("DENIED");
+                result.setMessage(result.getMessage() + " -> DENIED: not enough water in the reservoir");
+                addLog(parcel.getName(), "WARN", result.getMessage());
             }
-        } else if (decision.status() == IrrigationDecision.Status.FROST_HOLD) {
-            log(parcel, "FROST", decision.message());
+        } else if (result.getStatus().equals("FROST_HOLD")) {
+            addLog(parcel.getName(), "FROST", result.getMessage());
         }
-        parcel.recordDecision(decision);
+
+        parcel.setResult(result);
     }
 
-    public synchronized void changeStrategy(String parcelId, String strategyCode) {
+    public synchronized void changeIrrigation(String parcelId, String method) {
+        IrrigationStrategy strategy;
+        if (method.equals("Drip")) {
+            strategy = new DripIrrigation();
+        } else if (method.equals("Sprinkler")) {
+            strategy = new SprinklerIrrigation();
+        } else if (method.equals("Furrow")) {
+            strategy = new FurrowIrrigation();
+        } else {
+            throw new IllegalArgumentException("Unknown irrigation method: " + method);
+        }
+
         Parcel parcel = findParcel(parcelId);
-        parcel.getCrop().setIrrigationStrategy(IrrigationStrategies.byCode(strategyCode));
-        log(parcel, "INFO", "Irrigation method changed to " + parcel.getCrop().irrigationMethodName());
+        parcel.getCrop().setIrrigationStrategy(strategy);
+        addLog(parcel.getName(), "INFO", "Irrigation method changed to " + method);
         evaluate(parcel);
     }
 
-    public synchronized void changeStage(String parcelId, String stageCode) {
+    public synchronized void changeStage(String parcelId, String stage) {
         Parcel parcel = findParcel(parcelId);
-        parcel.getCrop().setGrowthStage(GrowthStage.valueOf(stageCode));
-        log(parcel, "INFO", "Growth stage changed to " + parcel.getCrop().getGrowthStage().label());
+        parcel.getCrop().setStage(GrowthStage.valueOf(stage));
+        addLog(parcel.getName(), "INFO", "Growth stage changed to " + stage);
         evaluate(parcel);
     }
 
-    public synchronized void emergencyTurn() {
-        double received = reservoir.receiveCommunalTurn();
-        log(null, "INFO", String.format(Locale.US, "Extra water turn: %.0f L added", received));
+    public synchronized void extraWaterTurn() {
+        reservoir.addWater(WATER_TURN);
+        addLog("Farm", "INFO", "Extra water turn, " + (int) WATER_TURN + " L added to the reservoir");
     }
 
-    private Parcel findParcel(String parcelId) {
-        return parcels.stream()
-                .filter(p -> p.getId().equals(parcelId))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Unknown parcel: " + parcelId));
+    private Parcel findParcel(String id) {
+        for (Parcel parcel : parcels) {
+            if (parcel.getId().equals(id)) {
+                return parcel;
+            }
+        }
+        throw new IllegalArgumentException("Parcel not found: " + id);
     }
 
-    private void log(Parcel parcel, String level, String message) {
-        log.addFirst(new LogEntry(clock.day(), clock.hour(), parcel == null ? "Farm" : parcel.getName(), level, message));
-        if (log.size() > LOG_SIZE) {
-            log.removeLast();
+    private void addLog(String parcel, String type, String message) {
+        String time = "D" + clock.getDay() + " " + String.format("%02d", clock.getHour()) + ":00";
+        log.add(0, new LogEntry(time, parcel, type, message));
+        if (log.size() > 150) {
+            log.remove(log.size() - 1);
         }
     }
 

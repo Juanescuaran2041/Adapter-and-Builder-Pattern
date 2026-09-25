@@ -1,26 +1,19 @@
 package irrigation;
 
-// Phenological stage of the crop. The offset shifts the perceived moisture:
-// negative = the plant needs more water, positive = excess water is harmful.
+//negative offset = the plant needs more water, positive = less water
 public enum GrowthStage {
-    SOWING("Sowing", -3),
-    VEGETATIVE("Vegetative growth", 0),
-    FLOWERING("Flowering", -5),
-    MATURATION("Maturation", 10);
+    SOWING(-3),
+    VEGETATIVE(0),
+    FLOWERING(-5),
+    MATURATION(10);
 
-    private final String label;
-    private final double moistureOffset;
+    private final double offset;
 
-    GrowthStage(String label, double moistureOffset) {
-        this.label = label;
-        this.moistureOffset = moistureOffset;
+    GrowthStage(double offset) {
+        this.offset = offset;
     }
 
-    public String label() {
-        return label;
-    }
-
-    public double moistureOffset() {
-        return moistureOffset;
+    public double getOffset() {
+        return offset;
     }
 }

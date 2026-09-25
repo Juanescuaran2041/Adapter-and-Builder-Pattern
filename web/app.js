@@ -1,240 +1,190 @@
-const STATUS = {
-    ACTIVE: {label: 'Irrigating', cls: 'text-bg-primary', icon: 'bi-droplet-fill'},
-    STANDBY: {label: 'Standby', cls: 'text-bg-secondary', icon: 'bi-pause-circle'},
-    FROST_PROTECTION: {label: 'Anti-frost', cls: 'text-bg-info', icon: 'bi-snow'},
-    FROST_HOLD: {label: 'Frost hold', cls: 'text-bg-info', icon: 'bi-snow2'},
-    DENIED: {label: 'Denied', cls: 'text-bg-warning', icon: 'bi-exclamation-triangle'},
-    SENSOR_ERROR: {label: 'Sensor error', cls: 'text-bg-danger', icon: 'bi-x-octagon'}
-};
+// if the page is not opened from the java server, the api is still on port 8080
+let server = '';
+if (location.port !== '8080') {
+    server = 'http://localhost:8080';
+}
 
-const LOG_LEVEL = {
-    WATER: {label: 'Irrigation', cls: 'text-bg-primary'},
-    FROST: {label: 'Frost', cls: 'text-bg-info'},
-    WARN: {label: 'Denied', cls: 'text-bg-warning'},
-    ERROR: {label: 'Sensor', cls: 'text-bg-danger'},
-    INFO: {label: 'Info', cls: 'text-bg-light border'}
-};
-
-const CROP_ICON = {'Potato': '🥔', 'Quinoa': '🌾', 'Fava bean': '🫘'};
-
-let state = null;
+let data = null;
 let autoTimer = null;
-let busy = false;
-const builtCards = new Set();
+let cardsCreated = false;
 
-const $ = (id) => document.getElementById(id);
-const fmt = (n, d = 1) => n === null || n === undefined ? '—' : Number(n).toLocaleString('en', {maximumFractionDigits: d, minimumFractionDigits: d});
-const pad = (n) => String(n).padStart(2, '0');
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+const statusColors = {
+    ACTIVE: 'bg-primary',
+    STANDBY: 'bg-secondary',
+    ANTI_FROST: 'bg-info text-dark',
+    FROST_HOLD: 'bg-info text-dark',
+    DENIED: 'bg-warning text-dark',
+    ERROR: 'bg-danger'
+};
 
-// If the page is opened from the file system or from IntelliJ's built-in preview,
-// the API still lives in the Java server on port 8080.
-const API_BASE = location.protocol === 'file:' || location.port !== '8080' ? 'http://localhost:8080' : '';
+const typeColors = {
+    WATER: 'bg-primary',
+    FROST: 'bg-info text-dark',
+    WARN: 'bg-warning text-dark',
+    ERROR: 'bg-danger',
+    INFO: 'bg-secondary'
+};
 
-async function api(path, method = 'GET') {
-    let res;
-    try {
-        res = await fetch(API_BASE + path, {method});
-    } catch (e) {
-        throw new Error('Cannot reach the Java server. Run Main.java and open http://localhost:8080');
+function call(url) {
+    fetch(server + url)
+        .then(response => response.json())
+        .then(result => {
+            if (result.error) {
+                showError(result.error);
+                return;
+            }
+            document.getElementById('error').classList.add('d-none');
+            document.getElementById('connection').textContent = 'Connected';
+            data = result;
+            showData();
+        })
+        .catch(() => {
+            document.getElementById('connection').textContent = 'Disconnected';
+            showError('Cannot connect with the Java server. Run Main.java and open http://localhost:8080');
+        });
+}
+
+function showError(message) {
+    const error = document.getElementById('error');
+    error.textContent = message;
+    error.classList.remove('d-none');
+}
+
+function showData() {
+    let dayText = data.isDay ? 'day' : 'night';
+    document.getElementById('time').textContent = 'Day ' + data.day + ' - ' + String(data.hour).padStart(2, '0') + ':00 (' + dayText + ')';
+
+    document.getElementById('temperature').textContent = data.temperature.toFixed(1) + ' °C';
+    let frost = document.getElementById('frost');
+    if (data.temperature <= 0) {
+        frost.innerHTML = '<span class="badge bg-info text-dark">FROST</span>';
+    } else if (data.temperature <= 3) {
+        frost.innerHTML = '<span class="badge bg-warning text-dark">Frost risk</span>';
+    } else {
+        frost.innerHTML = '<span class="badge bg-success">No frost</span>';
     }
-    const text = await res.text();
-    let body;
-    try {
-        body = JSON.parse(text);
-    } catch (e) {
-        throw new Error(`Unexpected server response (${res.status}). Open the page from http://localhost:8080`);
+
+    let percentage = data.reservoir / data.capacity * 100;
+    document.getElementById('reservoirText').textContent = Math.round(data.reservoir) + ' / ' + Math.round(data.capacity) + ' L';
+    document.getElementById('reservoirBar').style.width = percentage + '%';
+
+    let total = 0;
+    for (let parcel of data.parcels) {
+        total = total + parcel.waterUsed;
     }
-    if (!res.ok) throw new Error(body.error || res.statusText);
-    return body;
-}
+    document.getElementById('totalWater').textContent = Math.round(total) + ' L';
 
-async function run(path, method = 'POST') {
-    if (busy) return;
-    busy = true;
-    try {
-        render(await api(path, method));
-        setConnection(true);
-    } catch (e) {
-        showError(e.message);
-        setConnection(false);
-    } finally {
-        busy = false;
+    if (!cardsCreated) {
+        createCards();
+        cardsCreated = true;
     }
+    for (let parcel of data.parcels) {
+        updateCard(parcel);
+    }
+
+    showLog();
 }
 
-function setConnection(ok) {
-    $('connection').innerHTML = ok
-        ? '<i class="bi bi-circle-fill text-success"></i> Connected'
-        : '<i class="bi bi-circle-fill text-danger"></i> Disconnected';
-}
+function createCards() {
+    let html = '';
+    for (let parcel of data.parcels) {
+        html += `
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <b>${parcel.name}</b> - ${parcel.crop} (${Math.round(parcel.area)} m2)
+                    <span class="badge float-end" id="status-${parcel.id}"></span>
+                </div>
+                <div class="card-body">
+                    <div class="progress mb-2" style="height: 20px">
+                        <div class="progress-bar" id="moisture-${parcel.id}"></div>
+                    </div>
+                    <p class="small mb-2" id="water-${parcel.id}"></p>
 
-function showError(msg) {
-    $('errorText').textContent = msg;
-    bootstrap.Toast.getOrCreateInstance($('errorToast')).show();
-}
+                    <label class="small">Irrigation method</label>
+                    <select class="form-select form-select-sm mb-2" id="irrigation-${parcel.id}"
+                            onchange="call('/api/irrigation?parcel=${parcel.id}&method=' + this.value)">
+                        <option value="Drip">Drip (90%)</option>
+                        <option value="Sprinkler">Sprinkler (75%)</option>
+                        <option value="Furrow">Furrow (55%)</option>
+                    </select>
 
-function render(s) {
-    state = s;
-    renderHeader(s);
-    s.parcels.forEach(p => renderParcel(p, s));
-    renderLog();
-}
+                    <label class="small">Growth stage</label>
+                    <select class="form-select form-select-sm mb-2" id="stage-${parcel.id}"
+                            onchange="call('/api/stage?parcel=${parcel.id}&stage=' + this.value)">
+                        <option value="SOWING">Sowing</option>
+                        <option value="VEGETATIVE">Vegetative</option>
+                        <option value="FLOWERING">Flowering</option>
+                        <option value="MATURATION">Maturation</option>
+                    </select>
 
-function renderHeader(s) {
-    const {clock, reservoir} = s;
-    $('clock').textContent = `Day ${clock.day} · ${pad(clock.hour)}:00`;
-    $('daytime').innerHTML = clock.daytime
-        ? '<i class="bi bi-sun text-warning"></i> Day'
-        : '<i class="bi bi-moon-stars text-primary"></i> Night';
-
-    $('ambient').textContent = `${fmt(clock.temperature)} °C`;
-    const t = clock.temperature;
-    $('frostBadge').innerHTML = t <= 0
-        ? '<span class="badge text-bg-info"><i class="bi bi-snow"></i> Frost now</span>'
-        : t <= 3
-            ? '<span class="badge text-bg-warning"><i class="bi bi-exclamation-triangle"></i> Frost risk</span>'
-            : '<span class="badge text-bg-success"><i class="bi bi-check-circle"></i> No risk</span>';
-
-    const pct = reservoir.liters / reservoir.capacity * 100;
-    $('reservoirText').textContent = `${fmt(reservoir.liters, 0)} / ${fmt(reservoir.capacity, 0)} L`;
-    const bar = $('reservoirBar');
-    bar.style.width = `${pct}%`;
-    bar.className = 'progress-bar ' + (pct < 15 ? 'bg-danger' : pct < 35 ? 'bg-warning' : 'bg-primary');
-    $('reservoirNote').textContent = `Daily communal turn at 06:00 (+${fmt(reservoir.turnVolume, 0)} L)`;
-
-    const total = s.parcels.reduce((acc, p) => acc + p.waterUsed, 0);
-    $('totalWater').textContent = `${fmt(total, 0)} L`;
-}
-
-function buildCard(p, s) {
-    const col = document.createElement('div');
-    col.className = 'col-md-6 col-xl-4';
-    col.innerHTML = `
-      <div class="card parcel-card shadow-sm h-100">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <div>
-            <span class="fs-5">${CROP_ICON[p.crop] || '🌱'}</span>
-            <strong>${esc(p.name)}</strong>
-            <span class="text-body-secondary small">· ${esc(p.crop)} · ${fmt(p.area, 0)} m²</span>
-          </div>
-          <span class="badge" data-f="status"></span>
-        </div>
-        <div class="card-body">
-          <div class="d-flex justify-content-between small mb-1">
-            <span>Soil moisture</span><strong data-f="moisture"></strong>
-          </div>
-          <div class="progress mb-2" role="progressbar">
-            <div class="progress-bar" data-f="moistureBar"></div>
-          </div>
-          <svg class="sparkline mb-2" viewBox="0 0 200 60" preserveAspectRatio="none" data-f="spark"></svg>
-
-          <div class="row g-2 small mb-3">
-            <div class="col-6"><i class="bi bi-thermometer-half"></i> <span data-f="temp"></span></div>
-            <div class="col-6 text-end"><i class="bi bi-bucket"></i> <span data-f="water"></span></div>
-          </div>
-
-          <div class="row g-2 mb-3">
-            <div class="col-6">
-              <label class="form-label small mb-1">Irrigation method</label>
-              <select class="form-select form-select-sm" data-f="strategy">
-                ${s.strategies.map(st => `<option value="${st.code}">${esc(st.name)} (${Math.round(st.efficiency * 100)} %)</option>`).join('')}
-              </select>
+                    <div class="alert alert-light border small message mb-2" id="message-${parcel.id}"></div>
+                    <p class="small text-muted mb-0"><i class="bi bi-cpu"></i> ${parcel.device}</p>
+                </div>
             </div>
-            <div class="col-6">
-              <label class="form-label small mb-1">Growth stage</label>
-              <select class="form-select form-select-sm" data-f="stage">
-                ${s.stages.map(st => `<option value="${st.code}">${esc(st.label)}</option>`).join('')}
-              </select>
-            </div>
-          </div>
-
-          <div class="alert alert-light border small py-2 status-msg mb-2" data-f="message"></div>
-          <div class="small text-body-secondary"><i class="bi bi-cpu"></i> <span data-f="device"></span></div>
-        </div>
-      </div>`;
-    $('parcels').appendChild(col);
-    col.id = `parcel-${p.id}`;
-
-    col.querySelector('[data-f=strategy]').addEventListener('change', e =>
-        run(`/api/parcels/${p.id}/strategy?code=${encodeURIComponent(e.target.value)}`));
-    col.querySelector('[data-f=stage]').addEventListener('change', e =>
-        run(`/api/parcels/${p.id}/stage?code=${encodeURIComponent(e.target.value)}`));
-    builtCards.add(p.id);
+        </div>`;
+    }
+    document.getElementById('parcels').innerHTML = html;
 }
 
-function renderParcel(p, s) {
-    if (!builtCards.has(p.id)) buildCard(p, s);
-    const card = $(`parcel-${p.id}`);
-    const f = (name) => card.querySelector(`[data-f=${name}]`);
+function updateCard(parcel) {
+    let status = document.getElementById('status-' + parcel.id);
+    status.textContent = parcel.status;
+    status.className = 'badge float-end ' + statusColors[parcel.status];
 
-    const st = STATUS[p.status] || STATUS.STANDBY;
-    f('status').className = `badge ${st.cls}`;
-    f('status').innerHTML = `<i class="bi ${st.icon}"></i> ${st.label}`;
+    let bar = document.getElementById('moisture-' + parcel.id);
+    bar.style.width = parcel.moisture + '%';
+    bar.textContent = parcel.moisture.toFixed(1) + ' %';
+    if (parcel.moisture < 30) {
+        bar.className = 'progress-bar bg-danger';
+    } else if (parcel.moisture < 40) {
+        bar.className = 'progress-bar bg-warning';
+    } else {
+        bar.className = 'progress-bar bg-success';
+    }
 
-    f('moisture').textContent = p.moisture === null ? '—' : `${fmt(p.moisture)} %`;
-    const bar = f('moistureBar');
-    const m = p.moisture ?? 0;
-    bar.style.width = `${m}%`;
-    bar.className = 'progress-bar ' + (m < 30 ? 'bg-danger' : m < 40 ? 'bg-warning' : 'bg-success');
+    document.getElementById('water-' + parcel.id).textContent = 'Water used: ' + Math.round(parcel.waterUsed) + ' L';
+    document.getElementById('message-' + parcel.id).textContent = parcel.message;
 
-    f('temp').textContent = p.temperature === null ? '—'
-        : `${fmt(p.temperature)} °C ${p.hasTemperatureProbe ? '(probe)' : '(station)'}`;
-    f('water').textContent = `${fmt(p.waterUsed, 0)} L used`;
-    f('message').textContent = p.message || '—';
-    f('device').textContent = p.device;
-
-    const strategy = f('strategy');
-    if (document.activeElement !== strategy) strategy.value = p.strategy;
-    const stage = f('stage');
-    if (document.activeElement !== stage) stage.value = p.stage;
-
-    drawSparkline(f('spark'), p.history);
+    //dont change the select while the user is choosing an option
+    let irrigation = document.getElementById('irrigation-' + parcel.id);
+    if (document.activeElement !== irrigation) {
+        irrigation.value = parcel.irrigation;
+    }
+    let stage = document.getElementById('stage-' + parcel.id);
+    if (document.activeElement !== stage) {
+        stage.value = parcel.stage;
+    }
 }
 
-function drawSparkline(svg, values) {
-    if (!values.length) {
-        svg.innerHTML = '';
+function showLog() {
+    if (data == null) {
         return;
     }
-    const w = 200, h = 60, n = Math.max(values.length - 1, 1);
-    const pts = values.map((v, i) => [i / n * w, h - v / 100 * h]);
-    const line = pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
-    const y40 = h - 0.4 * h;
-    svg.innerHTML = `
-      <line class="threshold" x1="0" x2="${w}" y1="${y40}" y2="${y40}"></line>
-      <polygon class="area" points="0,${h} ${line} ${w},${h}"></polygon>
-      <polyline class="line" points="${line}"></polyline>
-      <title>Moisture over the last ${values.length} hours (red line: 40 %)</title>`;
-}
-
-function renderLog() {
-    if (!state) return;
-    const filter = $('logFilter').value;
-    const rows = state.log
-        .filter(e => !filter || e.level === filter)
-        .map(e => {
-            const lvl = LOG_LEVEL[e.level] || LOG_LEVEL.INFO;
-            return `<tr>
-              <td class="text-nowrap small">D${e.day} ${pad(e.hour)}:00</td>
-              <td class="text-nowrap small">${esc(e.parcel)}</td>
-              <td><span class="badge ${lvl.cls}">${lvl.label}</span></td>
-              <td class="small">${esc(e.message)}</td>
+    let filter = document.getElementById('logFilter').value;
+    let rows = '';
+    for (let entry of data.log) {
+        if (filter === '' || entry.type === filter) {
+            rows += `<tr>
+                <td class="small text-nowrap">${entry.time}</td>
+                <td class="small text-nowrap">${entry.parcel}</td>
+                <td><span class="badge ${typeColors[entry.type]}">${entry.type}</span></td>
+                <td class="small">${entry.message}</td>
             </tr>`;
-        });
-    $('log').innerHTML = rows.join('') ||
-        '<tr><td colspan="4" class="text-center text-body-secondary py-3">No events yet. Advance the simulation.</td></tr>';
+        }
+    }
+    if (rows === '') {
+        rows = '<tr><td colspan="4" class="text-center text-muted">No events yet</td></tr>';
+    }
+    document.getElementById('log').innerHTML = rows;
 }
 
-document.querySelectorAll('[data-hours]').forEach(btn =>
-    btn.addEventListener('click', () => run(`/api/tick?hours=${btn.dataset.hours}`)));
+function toggleAuto() {
+    if (document.getElementById('auto').checked) {
+        autoTimer = setInterval(() => call('/api/advance?hours=1'), 1500);
+    } else {
+        clearInterval(autoTimer);
+    }
+}
 
-$('btnTurn').addEventListener('click', () => run('/api/reservoir/turn'));
-$('logFilter').addEventListener('change', renderLog);
-
-$('autoPlay').addEventListener('change', e => {
-    clearInterval(autoTimer);
-    if (e.target.checked) autoTimer = setInterval(() => run('/api/tick?hours=1'), 1500);
-});
-
-run('/api/state', 'GET');
+call('/api/state');

@@ -9,15 +9,15 @@ public class TensiometerAdapter implements SoilMoistureSensor {
         this.tensiometer = tensiometer;
     }
 
-    // Higher tension means drier soil, so the scale is inverted
     @Override
     public double readSoilPercentage() {
         int centibars = tensiometer.readCentibars();
-        return 100 - (centibars / AnalogTensiometer.MAX_CENTIBARS) * 100;
+        //more centibars means drier soil, so we invert it
+        return 100 - (centibars / 85.0) * 100;
     }
 
     @Override
-    public String deviceInfo() {
-        return "Analog tensiometer " + tensiometer.getTag() + " (centibars) via TensiometerAdapter";
+    public String getDeviceName() {
+        return "Tensiometer " + tensiometer.getTag() + " (centibars) - TensiometerAdapter";
     }
 }

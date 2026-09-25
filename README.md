@@ -104,15 +104,6 @@ Requisito: **JDK 17 o superior** (el proyecto está configurado con JDK 21). No 
    - Una **ventana Swing** (escritorio).
    - Un **dashboard web** (HTML + Bootstrap): abre **http://localhost:8080** en el navegador.
 
-Para abrir solo una de las dos: *Run → Edit Configurations → Program arguments*:
-
-| Argumento | Qué abre |
-|---|---|
-| *(ninguno)* | Web + Swing |
-| `--swing`   | Solo la ventana Swing |
-| `--web`     | Solo el dashboard web |
-| `--console` | Simulación de 24 h en la consola |
-
 ### Desde la terminal (en la carpeta del proyecto)
 ```bash
 javac -encoding UTF-8 -d out $(find src -name "*.java")     # Git Bash / Linux / Mac
@@ -124,7 +115,7 @@ javac -encoding UTF-8 -d out (Get-ChildItem -Recurse src -Filter *.java).FullNam
 java -cp out Main
 ```
 
-> Si ves **"Unexpected token"** o **"Cannot reach the Java server"** en la web, es porque abriste
+> Si ves **"Unexpected token"** o **"Cannot connect with the Java server"** en la web, es porque abriste
 > `web/index.html` sin tener `Main` corriendo. Primero ejecuta `Main` y luego abre http://localhost:8080.
 
 ---
@@ -135,7 +126,7 @@ Cada prueba se puede hacer en la ventana **Swing** o en la **web** (tienen los m
 
 ### Prueba 1 — Adapter: tres sensores distintos, un solo formato
 1. Mira la última línea de cada tarjeta de parcela: dice qué sensor real hay y qué adapter lo traduce
-   (`via ModbusSensorAdapter`, `via LegacySerialAdapter`, `via TensiometerAdapter`).
+   (`ModbusSensorAdapter`, `LegacySerialAdapter`, `TensiometerAdapter`).
 2. Pulsa **+1 hour** varias veces.
 3. **Esperado:** las tres parcelas muestran la humedad en **%** (0–100), aunque un sensor
    entrega 0–1023, otro texto y otro centibares.
@@ -144,7 +135,7 @@ Cada prueba se puede hacer en la ventana **Swing** o en la **web** (tienen los m
 1. Activa **Auto** y deja correr la simulación un rato (o pulsa **+1 day** varias veces).
 2. En el **Event log**, filtra por **ERROR**.
 3. **Esperado:** aparecen eventos de *South Terrace* tipo
-   `Reading discarded: Corrupted serial frame (checksum mismatch)`. El `LegacySerialAdapter`
+   `Reading discarded: Corrupted serial frame: checksum mismatch.`. El `LegacySerialAdapter`
    detectó que la trama llegó dañada y la descartó en lugar de regar con un dato falso.
 
 ### Prueba 3 — Bridge: cambiar el método de riego en caliente
@@ -162,9 +153,9 @@ Cada prueba se puede hacer en la ventana **Swing** o en la **web** (tienen los m
 
 ### Prueba 5 — Heladas
 1. Avanza hasta la noche (entre las 23:00 y las 05:00 suele bajar de 0 °C). Mira *Weather station*.
-2. **Esperado** cuando dice **Frost now**:
-   - Parcela con **Sprinkler** → estado **Anti-frost** (riega para proteger del frío y gasta agua).
-   - Parcelas con **Drip** o **Furrow** → estado **Frost hold** (no riegan para que no se congelen las mangueras o el agua).
+2. **Esperado** cuando la temperatura baja de 0 (aparece **FROST**):
+   - Parcela con **Sprinkler** → estado **ANTI_FROST** (riega para proteger del frío y gasta agua).
+   - Parcelas con **Drip** o **Furrow** → estado **FROST_HOLD** (no riegan para que no se congelen las mangueras o el agua).
 
 ### Prueba 6 — Etapa del cultivo
 1. En *East Slope* (haba), cambia *Growth stage* a **Flowering**.
@@ -196,6 +187,6 @@ src/
   simulation/  → reloj y suelo simulados (reemplazan el hardware real)
   ui/          → interfaz de escritorio en Swing
   web/         → servidor HTTP del JDK + API JSON
-  Main.java    → arranca la finca y las interfaces
+  Main.java    → crea las parcelas, los cultivos y los sensores, y abre las interfaces
 web/           → front en HTML + Bootstrap (index.html, app.js, styles.css)
 ```

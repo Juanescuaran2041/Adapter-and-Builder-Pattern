@@ -1,56 +1,30 @@
 package farm;
 
 import irrigation.Crop;
-import irrigation.IrrigationDecision;
+import irrigation.IrrigationResult;
 import sensors.SoilMoistureSensor;
-import simulation.SoilEnvironment;
-
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Deque;
-import java.util.List;
+import simulation.Soil;
 
 public class Parcel {
 
-    private static final int HISTORY_SIZE = 48;
-
     private final String id;
     private final String name;
-    private final double areaM2;
+    private final double area;
     private final Crop crop;
     private final SoilMoistureSensor sensor;
-    private final SoilEnvironment soil;
+    private final Soil soil;
 
-    private final Deque<Double> moistureHistory = new ArrayDeque<>();
-    private Double lastMoisture;
-    private Double lastTemperature;
-    private IrrigationDecision lastDecision;
-    private double waterUsedLiters;
+    private double moisture;
+    private double waterUsed;
+    private IrrigationResult result;
 
-    public Parcel(String id, String name, double areaM2, Crop crop, SoilMoistureSensor sensor, SoilEnvironment soil) {
+    public Parcel(String id, String name, double area, Crop crop, SoilMoistureSensor sensor, Soil soil) {
         this.id = id;
         this.name = name;
-        this.areaM2 = areaM2;
+        this.area = area;
         this.crop = crop;
         this.sensor = sensor;
         this.soil = soil;
-    }
-
-    void recordReading(double moisture, double temperature) {
-        lastMoisture = moisture;
-        lastTemperature = temperature;
-        moistureHistory.addLast(moisture);
-        if (moistureHistory.size() > HISTORY_SIZE) {
-            moistureHistory.removeFirst();
-        }
-    }
-
-    void recordDecision(IrrigationDecision decision) {
-        lastDecision = decision;
-    }
-
-    void addWaterUsed(double liters) {
-        waterUsedLiters += liters;
     }
 
     public String getId() {
@@ -61,8 +35,8 @@ public class Parcel {
         return name;
     }
 
-    public double getAreaM2() {
-        return areaM2;
+    public double getArea() {
+        return area;
     }
 
     public Crop getCrop() {
@@ -73,27 +47,31 @@ public class Parcel {
         return sensor;
     }
 
-    SoilEnvironment getSoil() {
+    public Soil getSoil() {
         return soil;
     }
 
-    public Double getLastMoisture() {
-        return lastMoisture;
+    public double getMoisture() {
+        return moisture;
     }
 
-    public Double getLastTemperature() {
-        return lastTemperature;
+    public void setMoisture(double moisture) {
+        this.moisture = moisture;
     }
 
-    public IrrigationDecision getLastDecision() {
-        return lastDecision;
+    public double getWaterUsed() {
+        return waterUsed;
     }
 
-    public double getWaterUsedLiters() {
-        return waterUsedLiters;
+    public void setWaterUsed(double waterUsed) {
+        this.waterUsed = waterUsed;
     }
 
-    public List<Double> getMoistureHistory() {
-        return new ArrayList<>(moistureHistory);
+    public IrrigationResult getResult() {
+        return result;
+    }
+
+    public void setResult(IrrigationResult result) {
+        this.result = result;
     }
 }

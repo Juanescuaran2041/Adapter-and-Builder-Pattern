@@ -4,43 +4,33 @@ package irrigation;
 public abstract class Crop {
 
     protected IrrigationStrategy irrigationStrategy;
-    protected GrowthStage growthStage = GrowthStage.VEGETATIVE;
+    protected GrowthStage stage = GrowthStage.VEGETATIVE;
 
     protected Crop(IrrigationStrategy irrigationStrategy) {
         this.irrigationStrategy = irrigationStrategy;
     }
 
-    public abstract IrrigationDecision evaluateIrrigation(double moisture, double temperature);
+    public abstract IrrigationResult evaluateIrrigation(double moisture, double temperature);
 
-    public abstract String name();
+    public abstract String getName();
 
-    // The implementor can be swapped at runtime without touching the crop hierarchy
     public void setIrrigationStrategy(IrrigationStrategy irrigationStrategy) {
         this.irrigationStrategy = irrigationStrategy;
     }
 
-    // Clients only talk to the abstraction; it forwards to the implementor
-    public double irrigationEfficiency() {
-        return irrigationStrategy.efficiency();
+    public String getIrrigationName() {
+        return irrigationStrategy.getName();
     }
 
-    public String irrigationMethodCode() {
-        return irrigationStrategy.code();
+    public double getIrrigationEfficiency() {
+        return irrigationStrategy.getEfficiency();
     }
 
-    public String irrigationMethodName() {
-        return irrigationStrategy.name();
+    public GrowthStage getStage() {
+        return stage;
     }
 
-    public GrowthStage getGrowthStage() {
-        return growthStage;
-    }
-
-    public void setGrowthStage(GrowthStage growthStage) {
-        this.growthStage = growthStage;
-    }
-
-    protected double stageAdjusted(double moisture) {
-        return moisture + growthStage.moistureOffset();
+    public void setStage(GrowthStage stage) {
+        this.stage = stage;
     }
 }

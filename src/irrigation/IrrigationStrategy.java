@@ -1,13 +1,9 @@
 package irrigation;
 
-// Implementor side of the bridge
 public interface IrrigationStrategy {
-    IrrigationDecision activate(double moisture, double temperature);
+    IrrigationResult activate(double moisture, double temperature);
 
-    String code();
+    String getName();
 
-    String name();
-
-    // Fraction of the applied water that actually reaches the roots
-    double efficiency();
+    double getEfficiency();
 }

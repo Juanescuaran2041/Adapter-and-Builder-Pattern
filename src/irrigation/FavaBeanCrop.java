@@ -6,17 +6,19 @@ public class FavaBeanCrop extends Crop {
     }
 
     @Override
-    public IrrigationDecision evaluateIrrigation(double moisture, double temperature) {
-        // fava beans drop their flowers under water stress, so flowering gets extra priority
-        double adjusted = stageAdjusted(moisture);
-        if (growthStage == GrowthStage.FLOWERING) {
-            adjusted -= 5;
+    public IrrigationResult evaluateIrrigation(double moisture, double temperature) {
+        double adjusted = moisture + stage.getOffset();
+        //fava beans lose their flowers if they dont get water, so they need more in that stage
+        if (stage == GrowthStage.FLOWERING) {
+            adjusted = adjusted - 5;
         }
-        return irrigationStrategy.activate(adjusted, temperature).withPrefix("[Fava bean]");
+        IrrigationResult result = irrigationStrategy.activate(adjusted, temperature);
+        result.setMessage("[Fava bean] " + result.getMessage());
+        return result;
     }
 
     @Override
-    public String name() {
+    public String getName() {
         return "Fava bean";
     }
 }

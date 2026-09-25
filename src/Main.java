@@ -1,83 +1,70 @@
-import farm.FarmFactory;
 import farm.IrrigationController;
 import farm.Parcel;
+import farm.WaterReservoir;
+import irrigation.DripIrrigation;
+import irrigation.FavaBeanCrop;
+import irrigation.FurrowIrrigation;
+import irrigation.GrowthStage;
+import irrigation.PotatoCrop;
+import irrigation.QuinoaCrop;
+import irrigation.SprinklerIrrigation;
+import sensors.AnalogTensiometer;
+import sensors.LegacySerialAdapter;
+import sensors.LegacySerialSensor;
+import sensors.ModbusMoistureSensor;
+import sensors.ModbusSensorAdapter;
+import sensors.TensiometerAdapter;
+import simulation.FarmClock;
+import simulation.Soil;
 import ui.SwingDashboard;
 import web.WebServer;
 
-import java.awt.GraphicsEnvironment;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Arrays;
+import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
-// Usage:
-//   (no args)  -> web dashboard (http://localhost:8080) + Swing window, sharing the same farm
-//   --web      -> only the web dashboard
-//   --swing    -> only the Swing window
-//   --console  -> 24-hour text simulation
 public class Main {
+    public static void main(String[] args) {
+        FarmClock clock = new FarmClock();
 
-    private static final int PORT = 8080;
+        Soil highFieldSoil = new Soil(42);
+        Soil southTerraceSoil = new Soil(38);
+        Soil eastSlopeSoil = new Soil(45);
 
-    public static void main(String[] args) throws Exception {
-        List<String> options = Arrays.asList(args);
-        IrrigationController controller = FarmFactory.createAndeanFarm();
+        //bridge: each crop receives the irrigation method it will use
+        PotatoCrop potato = new PotatoCrop(new SprinklerIrrigation());
+        QuinoaCrop quinoa = new QuinoaCrop(new DripIrrigation());
+        quinoa.setStage(GrowthStage.FLOWERING);
+        FavaBeanCrop favaBean = new FavaBeanCrop(new FurrowIrrigation());
+        favaBean.setStage(GrowthStage.SOWING);
 
-        if (options.contains("--console")) {
-            runConsoleDemo(controller);
-            return;
-        }
+        //adapter: each sensor is different but all of them are used as SoilMoistureSensor
+        ModbusSensorAdapter modbusSensor = new ModbusSensorAdapter(new ModbusMoistureSensor(1, highFieldSoil));
+        LegacySerialAdapter serialSensor = new LegacySerialAdapter(new LegacySerialSensor("COM3", southTerraceSoil, clock));
+        TensiometerAdapter tensiometer = new TensiometerAdapter(new AnalogTensiometer("T-07", eastSlopeSoil));
 
-        boolean web = !options.contains("--swing");
-        boolean swing = !options.contains("--web") && !GraphicsEnvironment.isHeadless();
+        List<Parcel> parcels = new ArrayList<>();
+        parcels.add(new Parcel("P1", "High Field", 500, potato, modbusSensor, highFieldSoil));
+        parcels.add(new Parcel("P2", "South Terrace", 350, quinoa, serialSensor, southTerraceSoil));
+        parcels.add(new Parcel("P3", "East Slope", 250, favaBean, tensiometer, eastSlopeSoil));
 
-        if (web) {
-            startWebServer(controller);
-        }
-        if (swing) {
-            SwingDashboard.open(controller);
-        }
-    }
+        WaterReservoir reservoir = new WaterReservoir(30000, 22000);
+        IrrigationController controller = new IrrigationController(clock, reservoir, parcels);
 
-    private static void startWebServer(IrrigationController controller) {
-        Path webRoot = findWebFolder();
-        if (webRoot == null) {
-            System.err.println("Web folder not found; only the Swing window will be available.");
-            return;
+        //web page
+        File webFolder = new File("web");
+        if (!webFolder.exists()) {
+            webFolder = new File("../web");
         }
         try {
-            new WebServer(controller, PORT, webRoot).start();
-            System.out.println("Web dashboard running at http://localhost:" + PORT);
-        } catch (IOException e) {
-            System.err.println("Could not start the web server on port " + PORT + ": " + e.getMessage());
+            WebServer server = new WebServer(controller, webFolder);
+            server.start(8080);
+            System.out.println("Web page: http://localhost:8080");
+        } catch (Exception e) {
+            System.out.println("The web server could not start: " + e.getMessage());
         }
-    }
 
-    // Looks for the "web" folder in the working directory and its parents
-    private static Path findWebFolder() {
-        Path dir = Path.of("").toAbsolutePath();
-        while (dir != null) {
-            Path candidate = dir.resolve("web");
-            if (Files.isRegularFile(candidate.resolve("index.html"))) {
-                return candidate.normalize();
-            }
-            dir = dir.getParent();
-        }
-        return null;
-    }
-
-    private static void runConsoleDemo(IrrigationController controller) {
-        for (int i = 0; i < 24; i++) {
-            controller.tick();
-            System.out.printf(Locale.US, "%n--- Day %d, %02d:00 | reservoir %.0f L ---%n",
-                    controller.getClock().day(), controller.getClock().hour(), controller.getReservoir().getLiters());
-            for (Parcel parcel : controller.getParcels()) {
-                System.out.printf(Locale.US, "  %-14s %5.1f%% | %s%n", parcel.getName(),
-                        parcel.getLastMoisture() == null ? Double.NaN : parcel.getLastMoisture(),
-                        parcel.getLastDecision());
-            }
-        }
+        //desktop window
+        SwingDashboard.open(controller);
     }
 }

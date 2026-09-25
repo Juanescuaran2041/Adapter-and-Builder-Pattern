@@ -1,32 +1,28 @@
 package farm;
 
-// Community water tank ("qocha"). It is refilled only during the
-// communal water turn, so every liter has to be rationed among parcels.
 public class WaterReservoir {
 
     private final double capacity;
-    private final double turnVolume;
     private double liters;
 
-    public WaterReservoir(double capacity, double turnVolume, double initialLiters) {
+    public WaterReservoir(double capacity, double liters) {
         this.capacity = capacity;
-        this.turnVolume = turnVolume;
-        this.liters = Math.min(capacity, initialLiters);
+        this.liters = liters;
     }
 
-    public boolean withdraw(double amount) {
+    public boolean useWater(double amount) {
         if (amount > liters) {
             return false;
         }
-        liters -= amount;
+        liters = liters - amount;
         return true;
     }
 
-    // Returns the liters that actually entered the tank
-    public double receiveCommunalTurn() {
-        double before = liters;
-        liters = Math.min(capacity, liters + turnVolume);
-        return liters - before;
+    public void addWater(double amount) {
+        liters = liters + amount;
+        if (liters > capacity) {
+            liters = capacity;
+        }
     }
 
     public double getLiters() {
@@ -35,9 +31,5 @@ public class WaterReservoir {
 
     public double getCapacity() {
         return capacity;
-    }
-
-    public double getTurnVolume() {
-        return turnVolume;
     }
 }

@@ -2,39 +2,41 @@ package simulation;
 
 import java.util.Random;
 
-// Simulated clock of an Andean highland farm (~3800 m a.s.l.).
-// Each tick is one hour; nights can drop below 0 °C (frost risk).
 public class FarmClock {
 
-    private static final int START_HOUR = 6;
-
-    private int totalHours = START_HOUR;
+    private int day = 1;
+    private int hour = 6;
+    private double dayVariation = 0;
     private final Random random = new Random();
-    private double dailyOffset = 0;
 
-    public void advance() {
-        totalHours++;
-        if (hour() == 0) {
-            // every day is a bit colder or warmer than the previous one
-            dailyOffset = random.nextDouble() * 6 - 3;
+    //temperatures of a normal day in the highlands, from 00:00 to 23:00
+    private final double[] temperatures = {
+            -1, -2, -3, -3, -2, -1, 1, 4, 7, 10, 13, 15,
+            16, 17, 17, 16, 14, 11, 8, 6, 4, 2, 1, 0
+    };
+
+    public void nextHour() {
+        hour++;
+        if (hour == 24) {
+            hour = 0;
+            day++;
+            dayVariation = random.nextDouble() * 6 - 3;
         }
     }
 
-    public int day() {
-        return totalHours / 24 + 1;
+    public double getTemperature() {
+        return temperatures[hour] + dayVariation;
     }
 
-    public int hour() {
-        return totalHours % 24;
+    public boolean isDay() {
+        return hour >= 6 && hour < 18;
     }
 
-    // Daily cycle: warmest around 14:00, coldest around 02:00
-    public double ambientTemperature() {
-        double phase = (hour() - 14) / 24.0 * 2 * Math.PI;
-        return 7 + 10 * Math.cos(phase) + dailyOffset;
+    public int getDay() {
+        return day;
     }
 
-    public boolean isDaytime() {
-        return hour() >= 6 && hour() < 18;
+    public int getHour() {
+        return hour;
     }
 }

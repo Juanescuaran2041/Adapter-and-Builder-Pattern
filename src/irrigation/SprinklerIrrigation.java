@@ -1,33 +1,25 @@
 package irrigation;
 
 public class SprinklerIrrigation implements IrrigationStrategy {
-
-    private static final double FROST_THRESHOLD = 1.0;
-
     @Override
-    public IrrigationDecision activate(double moisture, double temperature) {
-        // Anti-frost technique: freezing water releases latent heat and protects the foliage
-        if (temperature <= FROST_THRESHOLD) {
-            return IrrigationDecision.frostProtection(
-                    "Sprinkler ANTI-FROST mode (freezing water releases heat and protects the foliage)", 2);
+    public IrrigationResult activate(double moisture, double temperature) {
+        //when there is frost the sprinkler waters the plants so the ice doesnt burn them
+        if (temperature <= 1) {
+            return new IrrigationResult("ANTI_FROST", "Sprinkler ANTI-FROST mode activated", 2);
         }
-        return moisture < 35
-                ? IrrigationDecision.active("Sprinkler irrigation ACTIVATED (wide coverage)", 5)
-                : IrrigationDecision.standby("Sprinkler irrigation on standby, moisture sufficient");
+        if (moisture < 35) {
+            return new IrrigationResult("ACTIVE", "Sprinkler irrigation ACTIVATED (wide coverage)", 5);
+        }
+        return new IrrigationResult("STANDBY", "Sprinkler irrigation on standby, moisture sufficient", 0);
     }
 
     @Override
-    public String code() {
-        return "SPRINKLER";
-    }
-
-    @Override
-    public String name() {
+    public String getName() {
         return "Sprinkler";
     }
 
     @Override
-    public double efficiency() {
+    public double getEfficiency() {
         return 0.75;
     }
 }

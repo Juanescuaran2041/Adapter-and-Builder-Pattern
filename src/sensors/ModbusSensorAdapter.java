@@ -13,14 +13,19 @@ public class ModbusSensorAdapter implements SoilMoistureSensor {
     @Override
     public double readSoilPercentage() {
         int raw = moistureSensor.readHoldingRegister(0);
-        // compensate the factory bias before converting counts to percentage
-        int corrected = raw - moistureSensor.getCalibrationOffset();
-        double percentage = (corrected / 1023.0) * 100;
-        return Math.max(0, Math.min(100, percentage));
+        raw = raw - moistureSensor.getCalibrationOffSet();
+        double percentage = (raw / 1023.0) * 100;
+        if (percentage > 100) {
+            percentage = 100;
+        }
+        if (percentage < 0) {
+            percentage = 0;
+        }
+        return percentage;
     }
 
     @Override
-    public String deviceInfo() {
-        return "Modbus RTU probe (slave #" + moistureSensor.getSlaveAddress() + ") via ModbusSensorAdapter";
+    public String getDeviceName() {
+        return "Modbus sensor (slave " + moistureSensor.getSlaveAddress() + ") - ModbusSensorAdapter";
     }
 }

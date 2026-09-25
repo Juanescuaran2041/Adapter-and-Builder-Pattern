@@ -1,28 +1,32 @@
 package sensors;
 
-import simulation.SoilEnvironment;
+import simulation.Soil;
 
 import java.util.Random;
 
-// Adaptee: mechanical tensiometer with a dial. It does not measure moisture
-// but soil water tension in centibars: 0 cb = saturated soil, ~85 cb = very dry.
+//it doesnt measure moisture, it measures the soil tension in centibars
+//0 = soil full of water, 85 = very dry soil
 public class AnalogTensiometer {
 
-    public static final double MAX_CENTIBARS = 85.0;
-
     private final String tag;
-    private final SoilEnvironment soil;
+    private final Soil soil;
     private final Random noiseGenerator = new Random();
 
-    public AnalogTensiometer(String tag, SoilEnvironment soil) {
+    public AnalogTensiometer(String tag, Soil soil) {
         this.tag = tag;
         this.soil = soil;
     }
 
     public int readCentibars() {
-        double tension = (100 - soil.moisture()) / 100.0 * MAX_CENTIBARS;
-        int noise = noiseGenerator.nextInt(5) - 2;
-        return (int) Math.max(0, Math.min(MAX_CENTIBARS, Math.round(tension) + noise));
+        int centibars = (int) ((100 - soil.getMoisture()) * 0.85);
+        centibars = centibars + noiseGenerator.nextInt(5) - 2;
+        if (centibars < 0) {
+            centibars = 0;
+        }
+        if (centibars > 85) {
+            centibars = 85;
+        }
+        return centibars;
     }
 
     public String getTag() {

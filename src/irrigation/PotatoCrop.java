@@ -7,12 +7,15 @@ public class PotatoCrop extends Crop {
 
     // POLYMORPHISM: overrides the abstract method with crop-specific behavior.
     @Override
-    public IrrigationDecision evaluateIrrigation(double moisture, double temperature) {
-        return irrigationStrategy.activate(stageAdjusted(moisture), temperature).withPrefix("[Potato]");
+    public IrrigationResult evaluateIrrigation(double moisture, double temperature) {
+        double adjusted = moisture + stage.getOffset();
+        IrrigationResult result = irrigationStrategy.activate(adjusted, temperature);
+        result.setMessage("[Potato] " + result.getMessage());
+        return result;
     }
 
     @Override
-    public String name() {
+    public String getName() {
         return "Potato";
     }
 }

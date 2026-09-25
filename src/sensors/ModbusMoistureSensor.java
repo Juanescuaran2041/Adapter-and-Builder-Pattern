@@ -1,28 +1,27 @@
 package sensors;
 
-import simulation.SoilEnvironment;
+import simulation.Soil;
 
 import java.util.Random;
 
-// Adaptee: industrial Modbus RTU probe, returns raw 10-bit counts (0..1023)
 public class ModbusMoistureSensor {
     private boolean connected = false;
     private final int slaveAddress;
-    private final SoilEnvironment soil;
+    private final Soil soil;
     //Simulate noise in sensors
     private final Random noiseGenerator = new Random();
 
-    //Factory calibration bias (datasheet): every raw reading is shifted by this amount
-    private static final int CALIBRATION_OFFSET = -12;
+    //Internal drift n calibration, the sensor always reads 12 less than the real value
+    private final int calibrationOffSet = -12;
 
-    public ModbusMoistureSensor(int slaveAddress, SoilEnvironment soil) {
+    public ModbusMoistureSensor(int slaveAddress, Soil soil) {
         this.slaveAddress = slaveAddress;
         this.soil = soil;
     }
 
     public void connect(){
         connected = true;
-        System.out.println("Connected to ModbusMoistureSensor slave #" + slaveAddress);
+        System.out.println("Connected to ModbusMoistureSensor");
     }
 
     public int readHoldingRegister(int registerAddress){
@@ -34,7 +33,7 @@ public class ModbusMoistureSensor {
         }
 
         int noise = noiseGenerator.nextInt(20) - 10;
-        int raw = (int) Math.round(soil.moisture() / 100.0 * 1023) + noise + CALIBRATION_OFFSET;
+        int raw = (int) (soil.getMoisture() / 100 * 1023) + noise + calibrationOffSet;
         return clamp(raw, 0, 1023);
     }
 
@@ -50,8 +49,8 @@ public class ModbusMoistureSensor {
         return slaveAddress;
     }
 
-    public int getCalibrationOffset() {
-        return CALIBRATION_OFFSET;
+    public int getCalibrationOffSet() {
+        return calibrationOffSet;
     }
 
     public int clamp(int value, int min, int max){
