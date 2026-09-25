@@ -5,11 +5,11 @@ public class FurrowIrrigation implements IrrigationStrategy {
     @Override
     public IrrigationDecision activate(double moisture, double temperature) {
         if (temperature <= 0) {
-            return IrrigationDecision.frostHold("Surcos cerrados: el agua estancada se congelaría sobre las raíces");
+            return IrrigationDecision.frostHold("Furrows closed: standing water would freeze over the roots");
         }
         return moisture < 30
-                ? IrrigationDecision.active("Riego por surcos ABIERTO (gravedad, alto consumo)", 8)
-                : IrrigationDecision.standby("Surcos cerrados, humedad suficiente");
+                ? IrrigationDecision.active("Furrow irrigation OPEN (gravity, high consumption)", 8)
+                : IrrigationDecision.standby("Furrows closed, moisture sufficient");
     }
 
     @Override
@@ -19,7 +19,7 @@ public class FurrowIrrigation implements IrrigationStrategy {
 
     @Override
     public String name() {
-        return "Surcos (gravedad)";
+        return "Furrow (gravity)";
     }
 
     @Override

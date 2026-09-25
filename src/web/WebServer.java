@@ -116,7 +116,6 @@ public class WebServer {
 
     private String parcelJson(Parcel p) {
         IrrigationDecision d = p.getLastDecision();
-        IrrigationStrategy s = p.getCrop().getIrrigationStrategy();
         String history = p.getMoistureHistory().stream().map(Json::num).collect(Collectors.joining(","));
         return "{"
                 + "\"id\":" + Json.str(p.getId())
@@ -124,7 +123,7 @@ public class WebServer {
                 + ",\"area\":" + Json.num(p.getAreaM2())
                 + ",\"crop\":" + Json.str(p.getCrop().name())
                 + ",\"stage\":" + Json.str(p.getCrop().getGrowthStage().name())
-                + ",\"strategy\":" + Json.str(s.code())
+                + ",\"strategy\":" + Json.str(p.getCrop().irrigationMethodCode())
                 + ",\"device\":" + Json.str(p.getSensor().deviceInfo())
                 + ",\"hasTemperatureProbe\":" + p.getSensor().readTemperature().isPresent()
                 + ",\"moisture\":" + Json.num(p.getLastMoisture())

@@ -37,7 +37,7 @@ public record IrrigationDecision(Status status, String message, double litersPer
     }
 
     public IrrigationDecision denied(String reason) {
-        return new IrrigationDecision(Status.DENIED, message + " → DENEGADO: " + reason, 0);
+        return new IrrigationDecision(Status.DENIED, message + " → DENIED: " + reason, 0);
     }
 
     public boolean usesWater() {

@@ -49,6 +49,6 @@ public class LegacySerialAdapter implements SoilMoistureSensor{
 
     @Override
     public String deviceInfo() {
-        return "Sonda serial RS-232 (" + sensor.getPortName() + ") vía LegacySerialAdapter";
+        return "RS-232 serial probe (" + sensor.getPortName() + ") via LegacySerialAdapter";
     }
 }

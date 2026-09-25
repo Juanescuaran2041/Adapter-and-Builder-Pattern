@@ -9,11 +9,11 @@ public class SprinklerIrrigation implements IrrigationStrategy {
         // Anti-frost technique: freezing water releases latent heat and protects the foliage
         if (temperature <= FROST_THRESHOLD) {
             return IrrigationDecision.frostProtection(
-                    "Aspersión ANTIHELADA activada (el agua al congelarse libera calor y protege el follaje)", 2);
+                    "Sprinkler ANTI-FROST mode (freezing water releases heat and protects the foliage)", 2);
         }
         return moisture < 35
-                ? IrrigationDecision.active("Aspersión ACTIVADA (amplia cobertura)", 5)
-                : IrrigationDecision.standby("Aspersión en espera, humedad suficiente");
+                ? IrrigationDecision.active("Sprinkler irrigation ACTIVATED (wide coverage)", 5)
+                : IrrigationDecision.standby("Sprinkler irrigation on standby, moisture sufficient");
     }
 
     @Override
@@ -23,7 +23,7 @@ public class SprinklerIrrigation implements IrrigationStrategy {
 
     @Override
     public String name() {
-        return "Aspersión";
+        return "Sprinkler";
     }
 
     @Override

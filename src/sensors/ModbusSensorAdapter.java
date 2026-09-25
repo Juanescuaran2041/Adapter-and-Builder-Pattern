@@ -21,6 +21,6 @@ public class ModbusSensorAdapter implements SoilMoistureSensor {
 
     @Override
     public String deviceInfo() {
-        return "Sonda Modbus RTU (esclavo #" + moistureSensor.getSlaveAddress() + ") vía ModbusSensorAdapter";
+        return "Modbus RTU probe (slave #" + moistureSensor.getSlaveAddress() + ") via ModbusSensorAdapter";
     }
 }

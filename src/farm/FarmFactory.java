@@ -38,11 +38,11 @@ public final class FarmFactory {
         favaBean.setGrowthStage(GrowthStage.SOWING);
 
         List<Parcel> parcels = List.of(
-                new Parcel("P1", "Chacra Alta", 500, potato,
+                new Parcel("P1", "High Field", 500, potato,
                         new ModbusSensorAdapter(new ModbusMoistureSensor(1, highField)), highField),
-                new Parcel("P2", "Andén Sur", 350, quinoa,
+                new Parcel("P2", "South Terrace", 350, quinoa,
                         new LegacySerialAdapter(new LegacySerialSensor("COM3", terrace)), terrace),
-                new Parcel("P3", "Ladera Este", 250, favaBean,
+                new Parcel("P3", "East Slope", 250, favaBean,
                         new TensiometerAdapter(new AnalogTensiometer("T-07", slope)), slope)
         );
 

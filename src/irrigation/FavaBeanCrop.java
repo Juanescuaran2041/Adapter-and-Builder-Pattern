@@ -12,11 +12,11 @@ public class FavaBeanCrop extends Crop {
         if (growthStage == GrowthStage.FLOWERING) {
             adjusted -= 5;
         }
-        return irrigationStrategy.activate(adjusted, temperature).withPrefix("[Haba]");
+        return irrigationStrategy.activate(adjusted, temperature).withPrefix("[Fava bean]");
     }
 
     @Override
     public String name() {
-        return "Haba";
+        return "Fava bean";
     }
 }

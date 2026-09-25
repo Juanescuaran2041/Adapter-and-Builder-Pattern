@@ -19,8 +19,17 @@ public abstract class Crop {
         this.irrigationStrategy = irrigationStrategy;
     }
 
-    public IrrigationStrategy getIrrigationStrategy() {
-        return irrigationStrategy;
+    // Clients only talk to the abstraction; it forwards to the implementor
+    public double irrigationEfficiency() {
+        return irrigationStrategy.efficiency();
+    }
+
+    public String irrigationMethodCode() {
+        return irrigationStrategy.code();
+    }
+
+    public String irrigationMethodName() {
+        return irrigationStrategy.name();
     }
 
     public GrowthStage getGrowthStage() {

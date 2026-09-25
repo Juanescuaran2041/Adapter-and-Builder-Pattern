@@ -34,7 +34,7 @@ public class IrrigationController {
         clock.advance();
         if (clock.hour() == COMMUNAL_TURN_HOUR) {
             double received = reservoir.receiveCommunalTurn();
-            log(null, "INFO", String.format(Locale.US, "Turno de agua comunal: ingresan %.0f L al reservorio", received));
+            log(null, "INFO", String.format(Locale.US, "Communal water turn: %.0f L added to the reservoir", received));
         }
         for (Parcel parcel : parcels) {
             parcel.getSoil().evaporate();
@@ -53,7 +53,7 @@ public class IrrigationController {
         try {
             moisture = parcel.getSensor().readSoilPercentage();
         } catch (RuntimeException e) {
-            IrrigationDecision error = IrrigationDecision.sensorError("Lectura descartada: " + e.getMessage());
+            IrrigationDecision error = IrrigationDecision.sensorError("Reading discarded: " + e.getMessage());
             parcel.recordDecision(error);
             log(parcel, "ERROR", error.message());
             return;
@@ -67,14 +67,14 @@ public class IrrigationController {
         if (decision.usesWater()) {
             double liters = decision.litersPerM2() * parcel.getAreaM2();
             if (reservoir.withdraw(liters)) {
-                double efficiency = parcel.getCrop().getIrrigationStrategy().efficiency();
+                double efficiency = parcel.getCrop().irrigationEfficiency();
                 parcel.getSoil().irrigate(decision.litersPerM2() * efficiency);
                 parcel.addWaterUsed(liters);
                 log(parcel, decision.status() == IrrigationDecision.Status.FROST_PROTECTION ? "FROST" : "WATER",
                         String.format(Locale.US, "%s — %.0f L", decision.message(), liters));
             } else {
                 decision = decision.denied(String.format(Locale.US,
-                        "reservorio insuficiente (%.0f L requeridos), esperar turno comunal", liters));
+                        "not enough water in the reservoir (%.0f L required), wait for the communal turn", liters));
                 log(parcel, "WARN", decision.message());
             }
         } else if (decision.status() == IrrigationDecision.Status.FROST_HOLD) {
@@ -86,20 +86,20 @@ public class IrrigationController {
     public synchronized void changeStrategy(String parcelId, String strategyCode) {
         Parcel parcel = findParcel(parcelId);
         parcel.getCrop().setIrrigationStrategy(IrrigationStrategies.byCode(strategyCode));
-        log(parcel, "INFO", "Método de riego cambiado a " + parcel.getCrop().getIrrigationStrategy().name());
+        log(parcel, "INFO", "Irrigation method changed to " + parcel.getCrop().irrigationMethodName());
         evaluate(parcel);
     }
 
     public synchronized void changeStage(String parcelId, String stageCode) {
         Parcel parcel = findParcel(parcelId);
         parcel.getCrop().setGrowthStage(GrowthStage.valueOf(stageCode));
-        log(parcel, "INFO", "Etapa fenológica: " + parcel.getCrop().getGrowthStage().label());
+        log(parcel, "INFO", "Growth stage changed to " + parcel.getCrop().getGrowthStage().label());
         evaluate(parcel);
     }
 
     public synchronized void emergencyTurn() {
         double received = reservoir.receiveCommunalTurn();
-        log(null, "INFO", String.format(Locale.US, "Turno de agua extraordinario: ingresan %.0f L", received));
+        log(null, "INFO", String.format(Locale.US, "Extra water turn: %.0f L added", received));
     }
 
     private Parcel findParcel(String parcelId) {
@@ -110,7 +110,7 @@ public class IrrigationController {
     }
 
     private void log(Parcel parcel, String level, String message) {
-        log.addFirst(new LogEntry(clock.day(), clock.hour(), parcel == null ? "Finca" : parcel.getName(), level, message));
+        log.addFirst(new LogEntry(clock.day(), clock.hour(), parcel == null ? "Farm" : parcel.getName(), level, message));
         if (log.size() > LOG_SIZE) {
             log.removeLast();
         }

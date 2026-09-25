@@ -1,21 +1,21 @@
 const STATUS = {
-    ACTIVE: {label: 'Regando', cls: 'text-bg-primary', icon: 'bi-droplet-fill'},
-    STANDBY: {label: 'En espera', cls: 'text-bg-secondary', icon: 'bi-pause-circle'},
-    FROST_PROTECTION: {label: 'Antihelada', cls: 'text-bg-info', icon: 'bi-snow'},
-    FROST_HOLD: {label: 'Suspendido por helada', cls: 'text-bg-info', icon: 'bi-snow2'},
-    DENIED: {label: 'Denegado', cls: 'text-bg-warning', icon: 'bi-exclamation-triangle'},
-    SENSOR_ERROR: {label: 'Error de sensor', cls: 'text-bg-danger', icon: 'bi-x-octagon'}
+    ACTIVE: {label: 'Irrigating', cls: 'text-bg-primary', icon: 'bi-droplet-fill'},
+    STANDBY: {label: 'Standby', cls: 'text-bg-secondary', icon: 'bi-pause-circle'},
+    FROST_PROTECTION: {label: 'Anti-frost', cls: 'text-bg-info', icon: 'bi-snow'},
+    FROST_HOLD: {label: 'Frost hold', cls: 'text-bg-info', icon: 'bi-snow2'},
+    DENIED: {label: 'Denied', cls: 'text-bg-warning', icon: 'bi-exclamation-triangle'},
+    SENSOR_ERROR: {label: 'Sensor error', cls: 'text-bg-danger', icon: 'bi-x-octagon'}
 };
 
 const LOG_LEVEL = {
-    WATER: {label: 'Riego', cls: 'text-bg-primary'},
-    FROST: {label: 'Helada', cls: 'text-bg-info'},
-    WARN: {label: 'Denegado', cls: 'text-bg-warning'},
+    WATER: {label: 'Irrigation', cls: 'text-bg-primary'},
+    FROST: {label: 'Frost', cls: 'text-bg-info'},
+    WARN: {label: 'Denied', cls: 'text-bg-warning'},
     ERROR: {label: 'Sensor', cls: 'text-bg-danger'},
     INFO: {label: 'Info', cls: 'text-bg-light border'}
 };
 
-const CROP_ICON = {Papa: '🥔', Quinua: '🌾', Haba: '🫘'};
+const CROP_ICON = {'Potato': '🥔', 'Quinoa': '🌾', 'Fava bean': '🫘'};
 
 let state = null;
 let autoTimer = null;
@@ -23,7 +23,7 @@ let busy = false;
 const builtCards = new Set();
 
 const $ = (id) => document.getElementById(id);
-const fmt = (n, d = 1) => n === null || n === undefined ? '—' : Number(n).toLocaleString('es', {maximumFractionDigits: d, minimumFractionDigits: d});
+const fmt = (n, d = 1) => n === null || n === undefined ? '—' : Number(n).toLocaleString('en', {maximumFractionDigits: d, minimumFractionDigits: d});
 const pad = (n) => String(n).padStart(2, '0');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 
@@ -36,14 +36,14 @@ async function api(path, method = 'GET') {
     try {
         res = await fetch(API_BASE + path, {method});
     } catch (e) {
-        throw new Error('No se pudo conectar con el servidor Java. Ejecuta Main.java y abre http://localhost:8080');
+        throw new Error('Cannot reach the Java server. Run Main.java and open http://localhost:8080');
     }
     const text = await res.text();
     let body;
     try {
         body = JSON.parse(text);
     } catch (e) {
-        throw new Error(`Respuesta inesperada del servidor (${res.status}). Abre la página desde http://localhost:8080`);
+        throw new Error(`Unexpected server response (${res.status}). Open the page from http://localhost:8080`);
     }
     if (!res.ok) throw new Error(body.error || res.statusText);
     return body;
@@ -65,8 +65,8 @@ async function run(path, method = 'POST') {
 
 function setConnection(ok) {
     $('connection').innerHTML = ok
-        ? '<i class="bi bi-circle-fill text-success"></i> Conectado'
-        : '<i class="bi bi-circle-fill text-danger"></i> Sin conexión';
+        ? '<i class="bi bi-circle-fill text-success"></i> Connected'
+        : '<i class="bi bi-circle-fill text-danger"></i> Disconnected';
 }
 
 function showError(msg) {
@@ -83,25 +83,25 @@ function render(s) {
 
 function renderHeader(s) {
     const {clock, reservoir} = s;
-    $('clock').textContent = `Día ${clock.day} · ${pad(clock.hour)}:00`;
+    $('clock').textContent = `Day ${clock.day} · ${pad(clock.hour)}:00`;
     $('daytime').innerHTML = clock.daytime
-        ? '<i class="bi bi-sun text-warning"></i> Día'
-        : '<i class="bi bi-moon-stars text-primary"></i> Noche';
+        ? '<i class="bi bi-sun text-warning"></i> Day'
+        : '<i class="bi bi-moon-stars text-primary"></i> Night';
 
     $('ambient').textContent = `${fmt(clock.temperature)} °C`;
     const t = clock.temperature;
     $('frostBadge').innerHTML = t <= 0
-        ? '<span class="badge text-bg-info"><i class="bi bi-snow"></i> Helada en curso</span>'
+        ? '<span class="badge text-bg-info"><i class="bi bi-snow"></i> Frost now</span>'
         : t <= 3
-            ? '<span class="badge text-bg-warning"><i class="bi bi-exclamation-triangle"></i> Riesgo de helada</span>'
-            : '<span class="badge text-bg-success"><i class="bi bi-check-circle"></i> Sin riesgo</span>';
+            ? '<span class="badge text-bg-warning"><i class="bi bi-exclamation-triangle"></i> Frost risk</span>'
+            : '<span class="badge text-bg-success"><i class="bi bi-check-circle"></i> No risk</span>';
 
     const pct = reservoir.liters / reservoir.capacity * 100;
     $('reservoirText').textContent = `${fmt(reservoir.liters, 0)} / ${fmt(reservoir.capacity, 0)} L`;
     const bar = $('reservoirBar');
     bar.style.width = `${pct}%`;
     bar.className = 'progress-bar ' + (pct < 15 ? 'bg-danger' : pct < 35 ? 'bg-warning' : 'bg-primary');
-    $('reservoirNote').textContent = `Turno comunal diario a las 06:00 (+${fmt(reservoir.turnVolume, 0)} L)`;
+    $('reservoirNote').textContent = `Daily communal turn at 06:00 (+${fmt(reservoir.turnVolume, 0)} L)`;
 
     const total = s.parcels.reduce((acc, p) => acc + p.waterUsed, 0);
     $('totalWater').textContent = `${fmt(total, 0)} L`;
@@ -122,7 +122,7 @@ function buildCard(p, s) {
         </div>
         <div class="card-body">
           <div class="d-flex justify-content-between small mb-1">
-            <span>Humedad del suelo</span><strong data-f="moisture"></strong>
+            <span>Soil moisture</span><strong data-f="moisture"></strong>
           </div>
           <div class="progress mb-2" role="progressbar">
             <div class="progress-bar" data-f="moistureBar"></div>
@@ -136,13 +136,13 @@ function buildCard(p, s) {
 
           <div class="row g-2 mb-3">
             <div class="col-6">
-              <label class="form-label small mb-1">Método de riego</label>
+              <label class="form-label small mb-1">Irrigation method</label>
               <select class="form-select form-select-sm" data-f="strategy">
                 ${s.strategies.map(st => `<option value="${st.code}">${esc(st.name)} (${Math.round(st.efficiency * 100)} %)</option>`).join('')}
               </select>
             </div>
             <div class="col-6">
-              <label class="form-label small mb-1">Etapa fenológica</label>
+              <label class="form-label small mb-1">Growth stage</label>
               <select class="form-select form-select-sm" data-f="stage">
                 ${s.stages.map(st => `<option value="${st.code}">${esc(st.label)}</option>`).join('')}
               </select>
@@ -179,8 +179,8 @@ function renderParcel(p, s) {
     bar.className = 'progress-bar ' + (m < 30 ? 'bg-danger' : m < 40 ? 'bg-warning' : 'bg-success');
 
     f('temp').textContent = p.temperature === null ? '—'
-        : `${fmt(p.temperature)} °C ${p.hasTemperatureProbe ? '(sonda)' : '(estación)'}`;
-    f('water').textContent = `${fmt(p.waterUsed, 0)} L usados`;
+        : `${fmt(p.temperature)} °C ${p.hasTemperatureProbe ? '(probe)' : '(station)'}`;
+    f('water').textContent = `${fmt(p.waterUsed, 0)} L used`;
     f('message').textContent = p.message || '—';
     f('device').textContent = p.device;
 
@@ -205,7 +205,7 @@ function drawSparkline(svg, values) {
       <line class="threshold" x1="0" x2="${w}" y1="${y40}" y2="${y40}"></line>
       <polygon class="area" points="0,${h} ${line} ${w},${h}"></polygon>
       <polyline class="line" points="${line}"></polyline>
-      <title>Humedad de las últimas ${values.length} horas (línea roja: 40 %)</title>`;
+      <title>Moisture over the last ${values.length} hours (red line: 40 %)</title>`;
 }
 
 function renderLog() {
@@ -223,7 +223,7 @@ function renderLog() {
             </tr>`;
         });
     $('log').innerHTML = rows.join('') ||
-        '<tr><td colspan="4" class="text-center text-body-secondary py-3">Sin eventos todavía. Avanza la simulación.</td></tr>';
+        '<tr><td colspan="4" class="text-center text-body-secondary py-3">No events yet. Advance the simulation.</td></tr>';
 }
 
 document.querySelectorAll('[data-hours]').forEach(btn =>

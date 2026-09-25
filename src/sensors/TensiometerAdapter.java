@@ -18,6 +18,6 @@ public class TensiometerAdapter implements SoilMoistureSensor {
 
     @Override
     public String deviceInfo() {
-        return "Tensiómetro analógico " + tensiometer.getTag() + " (centibares) vía TensiometerAdapter";
+        return "Analog tensiometer " + tensiometer.getTag() + " (centibars) via TensiometerAdapter";
     }
 }
