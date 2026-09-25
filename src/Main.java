@@ -19,15 +19,28 @@ public class Main {
             return;
         }
 
-        Path webRoot = Path.of("web").toAbsolutePath().normalize();
-        if (!Files.isDirectory(webRoot)) {
-            System.err.println("Web folder not found at " + webRoot + ". Run the program from the project root.");
+        Path webRoot = findWebFolder();
+        if (webRoot == null) {
+            System.err.println("Web folder not found. Run the program from the project root.");
             return;
         }
 
         new WebServer(controller, PORT, webRoot).start();
         System.out.println("SmartIrrigation dashboard running at http://localhost:" + PORT);
         System.out.println("Press Ctrl+C to stop.");
+    }
+
+    // Looks for the "web" folder in the working directory and its parents
+    private static Path findWebFolder() {
+        Path dir = Path.of("").toAbsolutePath();
+        while (dir != null) {
+            Path candidate = dir.resolve("web");
+            if (Files.isRegularFile(candidate.resolve("index.html"))) {
+                return candidate.normalize();
+            }
+            dir = dir.getParent();
+        }
+        return null;
     }
 
     private static void runConsoleDemo(IrrigationController controller) {

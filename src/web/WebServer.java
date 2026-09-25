@@ -206,6 +206,8 @@ public class WebServer {
     private static void send(HttpExchange exchange, int status, String contentType, byte[] body) throws IOException {
         exchange.getResponseHeaders().set("Content-Type", contentType);
         exchange.getResponseHeaders().set("Cache-Control", "no-store");
+        // allows opening index.html from IntelliJ's preview or the file system
+        exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
         exchange.sendResponseHeaders(status, body.length);
         try (OutputStream os = exchange.getResponseBody()) {
             os.write(body);

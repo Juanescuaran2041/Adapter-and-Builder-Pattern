@@ -27,9 +27,24 @@ const fmt = (n, d = 1) => n === null || n === undefined ? '—' : Number(n).toLo
 const pad = (n) => String(n).padStart(2, '0');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 
+// If the page is opened from the file system or from IntelliJ's built-in preview,
+// the API still lives in the Java server on port 8080.
+const API_BASE = location.protocol === 'file:' || location.port !== '8080' ? 'http://localhost:8080' : '';
+
 async function api(path, method = 'GET') {
-    const res = await fetch(path, {method});
-    const body = await res.json();
+    let res;
+    try {
+        res = await fetch(API_BASE + path, {method});
+    } catch (e) {
+        throw new Error('No se pudo conectar con el servidor Java. Ejecuta Main.java y abre http://localhost:8080');
+    }
+    const text = await res.text();
+    let body;
+    try {
+        body = JSON.parse(text);
+    } catch (e) {
+        throw new Error(`Respuesta inesperada del servidor (${res.status}). Abre la página desde http://localhost:8080`);
+    }
     if (!res.ok) throw new Error(body.error || res.statusText);
     return body;
 }
